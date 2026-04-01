@@ -7,16 +7,22 @@ import type { BatchSummary } from "@/lib/types";
 
 interface BatchGridProps {
   batches: BatchSummary[];
+  emptyActionHref?: string;
+  emptyActionLabel?: string;
 }
 
-export function BatchGrid({ batches }: BatchGridProps) {
+export function BatchGrid({
+  batches,
+  emptyActionHref = "/create-batch",
+  emptyActionLabel = "Create first batch"
+}: BatchGridProps) {
   if (batches.length === 0) {
     return (
       <EmptyState
         title="No agricultural batches have been registered yet."
         description="Create the first Finca batch to mint a genesis block, then start adding supply chain events from harvest to shelf."
-        actionHref="/create-batch"
-        actionLabel="Create first batch"
+        actionHref={emptyActionHref}
+        actionLabel={emptyActionLabel}
       />
     );
   }

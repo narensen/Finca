@@ -7,11 +7,10 @@ import { Sprout } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Overview" },
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/create-batch", label: "Create Batch" },
-  { href: "/add-event", label: "Add Event" },
-  { href: "/verify", label: "Verify" }
+  { href: "/", label: "Farmer Mode" },
+  { href: "/advanced", label: "Advanced Mode" },
+  { href: "/dashboard", label: "Explorer" },
+  { href: "/assistant", label: "Assistant" }
 ];
 
 export function Navbar() {

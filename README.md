@@ -21,6 +21,7 @@ Tagline: `From Farm to Trust — Verified.`
 - `/add-event` append a supply-chain event
 - `/batches/[batchId]` synchronized timeline + blockchain explorer
 - `/verify` backend validation workspace
+- `/assistant` AI interpreter workspace
 
 ## Core Rules Enforced
 
@@ -38,6 +39,11 @@ Copy `.env.example` to `.env.local` and set:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_API_URL=https://your-render-url.onrender.com/api/v1
+API_URL=
+API_HOSTPORT=
+SUPABASE_SERVICE_ROLE_KEY=
+GROQ_API_KEY=
+FINCA_AI_MODEL=llama-3.3-70b-versatile
 ```
 
 ## Local Development
@@ -77,6 +83,12 @@ Validate:
 1. Frontend fetches the stored chain from Supabase
 2. Frontend sends it to `POST /validate`
 3. Validation status drives green glow or broken-chain visuals
+
+AI assistant:
+
+1. Frontend sends a structured request to `POST /api/ai`
+2. The server-side AI route returns a structured response envelope
+3. The interpreter layer updates chat UI, optional audio playback, and any routed UI action
 
 ## API Adapter Note
 

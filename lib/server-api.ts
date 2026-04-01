@@ -1,13 +1,53 @@
 const placeholderApiUrl = "https://your-render-url.onrender.com/api/v1";
 
-function getServerApiUrl() {
-  const configuredUrl = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "";
+export function getServerApiUrl() {
+  const hostport = process.env.API_HOSTPORT?.trim() ?? "";
+  const configuredUrl = process.env.API_URL?.trim() ?? process.env.NEXT_PUBLIC_API_URL?.trim() ?? "";
+
+  if (hostport) {
+    const prefixed = /^https?:\/\//.test(hostport) ? hostport : `http://${hostport}`;
+    const normalized = prefixed.replace(/\/+$/, "");
+
+    return normalized.endsWith("/api/v1") ? normalized : `${normalized}/api/v1`;
+  }
 
   if (!configuredUrl || configuredUrl === placeholderApiUrl) {
-    throw new Error("API_URL is missing. Configure API_URL or NEXT_PUBLIC_API_URL on the server.");
+    throw new Error("API_URL is missing. Configure API_URL, API_HOSTPORT, or NEXT_PUBLIC_API_URL on the server.");
   }
 
   return configuredUrl.replace(/\/+$/, "");
+}
+
+export async function postBlockchainJson<T>(path: string, payload: unknown): Promise<T> {
+  const upstream = await fetch(`${getServerApiUrl()}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload),
+    cache: "no-store"
+  });
+
+  const data = (await upstream.json().catch(() => null)) as
+    | (T & {
+        message?: string;
+      })
+    | null;
+
+  if (!upstream.ok) {
+    const message =
+      data && typeof data === "object" && "message" in data && typeof data.message === "string"
+        ? data.message
+        : `Blockchain service request failed with status ${upstream.status}.`;
+
+    throw new Error(message);
+  }
+
+  if (!data) {
+    throw new Error("The blockchain service returned an empty response.");
+  }
+
+  return data;
 }
 
 export async function forwardBlockchainPost(request: Request, path: string) {
