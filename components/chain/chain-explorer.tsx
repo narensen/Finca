@@ -7,6 +7,7 @@ import { ArrowRight, Blocks, Clock3, Leaf, ScanSearch } from "lucide-react";
 import { BlockCard } from "@/components/chain/block-card";
 import { Timeline } from "@/components/chain/timeline";
 import { ValidationBadge } from "@/components/chain/validation-badge";
+import { useLanguage } from "@/components/providers/language-provider";
 import { EmptyState } from "@/components/state/empty-state";
 import { formatDateTime, getBlockHeadline, getBlockNarrative } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ interface ChainExplorerProps {
 }
 
 export function ChainExplorer({ batch, blocks, validation = null }: ChainExplorerProps) {
+  const { t } = useLanguage();
   const [activeIndex, setActiveIndex] = useState(Math.max(blocks.length - 1, 0));
   const [expandedIndex, setExpandedIndex] = useState<number | null>(blocks.length > 0 ? blocks.length - 1 : null);
 
@@ -30,10 +32,10 @@ export function ChainExplorer({ batch, blocks, validation = null }: ChainExplore
   if (blocks.length === 0) {
     return (
       <EmptyState
-        title="This batch does not have any chain data yet."
-        description="Once the first verified record exists, Finca will show the full journey here from origin onward."
+        title={t("chainExplorer.emptyTitle")}
+        description={t("chainExplorer.emptyDescription")}
         actionHref={`/add-event?batchId=${batch.batch_id}`}
-        actionLabel="Add a supply chain event"
+        actionLabel={t("chainExplorer.addSupplyEvent")}
       />
     );
   }
@@ -51,11 +53,9 @@ export function ChainExplorer({ batch, blocks, validation = null }: ChainExplore
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-3">
-              <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">Synchronized explorer</p>
-              <h2 className="text-3xl font-semibold text-black">{batch.crop_name} chain</h2>
-              <p className="max-w-2xl text-sm leading-7 text-black/68">
-                The story view and the chain view stay locked to the same moment, so trust and traceability stay aligned.
-              </p>
+              <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">{t("chainExplorer.synchronizedExplorer")}</p>
+              <h2 className="text-3xl font-semibold text-black">{batch.crop_name} {t("chainExplorer.titleSuffix")}</h2>
+              <p className="max-w-2xl text-sm leading-7 text-black/68">{t("chainExplorer.description")}</p>
             </div>
             <ValidationBadge validation={validation} />
           </div>
@@ -64,7 +64,7 @@ export function ChainExplorer({ batch, blocks, validation = null }: ChainExplore
             <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-5">
               <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-black/45">
                 <Leaf className="h-4 w-4" />
-                Selected event
+                {t("chainExplorer.selectedEvent")}
               </div>
               <p className="text-xl font-semibold text-black">{getBlockHeadline(activeBlock)}</p>
               <p className="mt-2 text-sm leading-7 text-black/65">{getBlockNarrative(activeBlock)}</p>
@@ -72,41 +72,37 @@ export function ChainExplorer({ batch, blocks, validation = null }: ChainExplore
             <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-5">
               <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-black/45">
                 <Clock3 className="h-4 w-4" />
-                Timestamp
+                {t("chainExplorer.timestamp")}
               </div>
               <p className="text-lg font-semibold text-black">{formatDateTime(activeBlock.timestamp)}</p>
-              <p className="mt-2 text-sm text-black/65">Block {activeBlock.index} is active in both views.</p>
+              <p className="mt-2 text-sm text-black/65">{t("chainExplorer.blockActive", { index: activeBlock.index })}</p>
             </div>
             <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-5">
               <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-black/45">
                 <ScanSearch className="h-4 w-4" />
-                Technical sync
+                {t("chainExplorer.technicalSync")}
               </div>
-              <p className="text-lg font-semibold text-black">{blocks.length} connected blocks</p>
-              <p className="mt-2 text-sm text-black/65">
-                Click any timeline event or block card to pivot the explorer instantly.
-              </p>
+              <p className="text-lg font-semibold text-black">{t("chainExplorer.connectedBlocks", { count: blocks.length })}</p>
+              <p className="mt-2 text-sm text-black/65">{t("chainExplorer.clickToPivot")}</p>
             </div>
           </div>
         </motion.div>
 
         <div className="glass-panel flex flex-col justify-between p-6 lg:p-7">
           <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">Trust signal</p>
-            <h3 className="mt-3 text-2xl font-semibold text-black">From farm to shelf, block by block.</h3>
-            <p className="mt-3 text-sm leading-7 text-black/65">
-              Every batch follows its own trusted journey, making each handoff easy to inspect and understand.
-            </p>
+            <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">{t("chainExplorer.trustSignal")}</p>
+            <h3 className="mt-3 text-2xl font-semibold text-black">{t("chainExplorer.trustTitle")}</h3>
+            <p className="mt-3 text-sm leading-7 text-black/65">{t("chainExplorer.trustDesc")}</p>
           </div>
 
           <div className="mt-6 space-y-4">
             <div className="flex items-center gap-3 rounded-2xl border border-black/10 bg-black/[0.03] p-4">
               <Blocks className="h-5 w-5 text-finca-mint" />
-              <p className="text-sm text-black/70">Every step stays connected in one visible journey.</p>
+              <p className="text-sm text-black/70">{t("chainExplorer.everyStepConnected")}</p>
             </div>
             <div className="flex items-center gap-3 rounded-2xl border border-black/10 bg-black/[0.03] p-4">
               <ArrowRight className="h-5 w-5 text-finca-gold" />
-              <p className="text-sm text-black/70">Validation results drive the glow or broken-chain states.</p>
+              <p className="text-sm text-black/70">{t("chainExplorer.validationGlow")}</p>
             </div>
           </div>
         </div>
@@ -126,11 +122,9 @@ export function ChainExplorer({ batch, blocks, validation = null }: ChainExplore
 
         <div className="glass-panel p-6 lg:p-7">
           <div className="mb-6">
-            <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">Chain view</p>
-            <h3 className="mt-3 text-2xl font-semibold text-black">Connected custody chain</h3>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-black/65">
-              Each block stays connected and expandable so the full journey can be inspected in detail.
-            </p>
+            <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">{t("chainExplorer.chainView")}</p>
+            <h3 className="mt-3 text-2xl font-semibold text-black">{t("chainExplorer.chainViewTitle")}</h3>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-black/65">{t("chainExplorer.chainViewDesc")}</p>
           </div>
 
           <div className="space-y-4">

@@ -4,21 +4,17 @@ import { useLayoutEffect, useRef } from "react";
 import { Blocks, ShieldCheck, Sprout, Store, Truck, Warehouse } from "lucide-react";
 import gsap from "gsap";
 
+import type { AdvancedCopy } from "@/lib/advanced-copy";
 import { cn } from "@/lib/utils";
 
-const steps = [
-  { title: "Farm", subtitle: "Harvest recorded", icon: Sprout },
-  { title: "Processing", subtitle: "Quality events logged", icon: Warehouse },
-  { title: "Transit", subtitle: "Movement anchored", icon: Truck },
-  { title: "Retail", subtitle: "Shelf handoff tracked", icon: Store },
-  { title: "Trust", subtitle: "Integrity verified", icon: ShieldCheck }
-];
+const stepIcons = [Sprout, Warehouse, Truck, Store, ShieldCheck] as const;
 
 interface FlowVisualizerProps {
+  copy: AdvancedCopy["flow"];
   className?: string;
 }
 
-export function FlowVisualizer({ className }: FlowVisualizerProps) {
+export function FlowVisualizer({ copy, className }: FlowVisualizerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const lineRef = useRef<HTMLDivElement>(null);
   const tokenRef = useRef<HTMLDivElement>(null);
@@ -100,11 +96,11 @@ export function FlowVisualizer({ className }: FlowVisualizerProps) {
     <div className={cn("glass-panel overflow-hidden p-6 sm:p-8", className)} ref={rootRef}>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">Trusted movement</p>
-          <h3 className="mt-3 text-2xl font-semibold text-black">Every custody handoff is visible.</h3>
+          <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">{copy.badge}</p>
+          <h3 className="mt-3 text-2xl font-semibold text-black">{copy.title}</h3>
         </div>
         <span className="rounded-full border border-black/10 bg-black/[0.03] px-3 py-1 text-xs uppercase tracking-[0.28em] text-black/60">
-          Journey flow
+          {copy.journeyLabel}
         </span>
       </div>
 
@@ -129,8 +125,8 @@ export function FlowVisualizer({ className }: FlowVisualizerProps) {
             </div>
 
             <div className="relative grid grid-cols-5 gap-4">
-              {steps.map((step) => {
-                const Icon = step.icon;
+              {copy.steps.map((step, index) => {
+                const Icon = stepIcons[index] ?? ShieldCheck;
 
                 return (
                   <div key={step.title} data-flow-node className="relative pb-12">
@@ -156,13 +152,13 @@ export function FlowVisualizer({ className }: FlowVisualizerProps) {
             <div className="flex flex-wrap items-center gap-3 text-sm text-black/65">
               <span className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1.5 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
                 <Blocks className="h-4 w-4 text-black" />
-                Verified chain records
+                {copy.chips[0]}
               </span>
               <span className="rounded-full border border-black/10 bg-white px-3 py-1.5 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
-                Farm to shelf visibility
+                {copy.chips[1]}
               </span>
               <span className="rounded-full border border-black/10 bg-white px-3 py-1.5 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
-                Story view + chain view stay aligned
+                {copy.chips[2]}
               </span>
             </div>
           </div>

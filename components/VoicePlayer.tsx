@@ -3,6 +3,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Pause, Play, Volume2 } from "lucide-react";
 
+import { useLanguage } from "@/components/providers/language-provider";
+
 function formatDuration(value: number) {
   if (!Number.isFinite(value) || value < 0) {
     return "0:00";
@@ -20,6 +22,7 @@ interface VoicePlayerProps {
 }
 
 export function VoicePlayer({ src, autoplay = false }: VoicePlayerProps) {
+  const { t } = useLanguage();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const autoPlayedForSource = useRef<string | null>(null);
   const progressId = useId();
@@ -158,7 +161,7 @@ export function VoicePlayer({ src, autoplay = false }: VoicePlayerProps) {
             void togglePlayback();
           }}
           className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-black/10 bg-white text-black transition duration-300 hover:border-black/25 hover:bg-black/[0.03]"
-          aria-label={isPlaying ? "Pause audio response" : "Play audio response"}
+          aria-label={isPlaying ? t("voicePlayer.pause") : t("voicePlayer.play")}
         >
           {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </button>
@@ -167,7 +170,7 @@ export function VoicePlayer({ src, autoplay = false }: VoicePlayerProps) {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-black/45">
               <Volume2 className="h-3.5 w-3.5" />
-              Voice response
+              {t("voicePlayer.voiceResponse")}
             </div>
             <p className="text-xs text-black/55">
               {formatDuration(currentTime)} / {formatDuration(duration)}
@@ -175,7 +178,7 @@ export function VoicePlayer({ src, autoplay = false }: VoicePlayerProps) {
           </div>
 
           <label htmlFor={progressId} className="sr-only">
-            Audio playback progress
+            {t("voicePlayer.progress")}
           </label>
           <input
             id={progressId}

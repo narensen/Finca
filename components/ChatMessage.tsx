@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Bot, User2 } from "lucide-react";
 
+import { useLanguage } from "@/components/providers/language-provider";
 import { VoicePlayer } from "@/components/VoicePlayer";
 import { cn } from "@/lib/utils";
 import type { AIChatMessage } from "@/lib/types";
@@ -12,6 +13,7 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
+  const { t } = useLanguage();
   const assistant = message.role === "assistant";
 
   return (
@@ -37,7 +39,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </span>
           <div>
             <p className={cn("text-sm font-semibold", assistant ? "text-black" : "text-white")}>
-              {assistant ? "Finca Assistant" : "You"}
+              {assistant ? t("chatMessage.assistantName") : t("chatMessage.you")}
             </p>
             {assistant && message.response?.intent ? (
               <p className="text-xs uppercase tracking-[0.22em] text-black/45">{message.response.intent}</p>
@@ -58,12 +60,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
             ) : null}
             {typeof message.response.confidence === "number" ? (
               <span className="rounded-full border border-black/10 bg-black/[0.03] px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-black/55">
-                Confidence {Math.round(message.response.confidence * 100)}%
+                {t("chatMessage.confidence", { value: Math.round(message.response.confidence * 100) })}
               </span>
             ) : null}
             {message.response.requires_user_action ? (
               <span className="rounded-full border border-finca-gold/20 bg-finca-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-black/65">
-                User action needed
+                {t("chatMessage.userActionNeeded")}
               </span>
             ) : null}
           </div>
@@ -71,7 +73,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
         {assistant && message.response?.follow_up_question ? (
           <div className="rounded-[22px] border border-finca-gold/20 bg-finca-gold/10 p-4">
-            <p className="text-xs uppercase tracking-[0.22em] text-black/45">Follow-up needed</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-black/45">{t("assistant.followUpNeeded")}</p>
             <p className="mt-2 text-sm leading-7 text-black/72">{message.response.follow_up_question}</p>
           </div>
         ) : null}

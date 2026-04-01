@@ -6,6 +6,7 @@ import { Bot, Loader2, Mic, MicOff, SendHorizontal, Sparkles, Volume2 } from "lu
 import { useRouter } from "next/navigation";
 
 import { ChatMessage } from "@/components/ChatMessage";
+import { useLanguage } from "@/components/providers/language-provider";
 import { handleAssistantAction } from "@/lib/actionHandler";
 import { sendAIQuery } from "@/lib/aiClient";
 import { cn, toTitleCase } from "@/lib/utils";
@@ -35,9 +36,9 @@ function getValidationFlag(data: Record<string, unknown> | null) {
   return null;
 }
 
-function renderValue(value: unknown) {
+function renderValue(value: unknown, fallbackLabel: string) {
   if (value === null || value === undefined) {
-    return "Not provided";
+    return fallbackLabel;
   }
 
   if (typeof value === "object") {
@@ -81,9 +82,35 @@ function getBatchIdFromResponse(response: AIResponse | null) {
   return null;
 }
 
-function getReadableActionLabel(value: string | null) {
+function getReadableActionLabel(
+  value: string | null,
+  fallbackLabel: string,
+  t: (key: string, values?: Record<string, string | number>) => string
+) {
   if (!value) {
-    return "Waiting for assistant response";
+    return fallbackLabel;
+  }
+
+  const knownLabels: Record<string, string> = {
+    SHOW_BATCH_DETAILS: t("assistant.actionShowBatchDetails"),
+    SHOW_DASHBOARD: t("assistant.actionShowDashboard"),
+    SHOW_VERIFICATION_RESULT: t("assistant.actionShowVerification"),
+    SHOW_ERROR: t("assistant.actionShowError"),
+    PLAY_AUDIO: t("assistant.actionPlayAudio"),
+    create_batch: t("assistant.intentCreateBatch"),
+    add_block: t("assistant.intentAddBlock"),
+    validate_chain: t("assistant.intentValidateChain"),
+    get_batch_details: t("assistant.intentGetBatchDetails"),
+    explain_batch: t("assistant.intentExplainBatch"),
+    translate_explain: t("assistant.intentTranslateExplain"),
+    voice_explain: t("assistant.intentVoiceExplain"),
+    get_dashboard_summary: t("assistant.intentDashboardSummary"),
+    search_history: t("assistant.intentSearchHistory"),
+    tamper_check: t("assistant.intentTamperCheck")
+  };
+
+  if (value in knownLabels) {
+    return knownLabels[value];
   }
 
   return toTitleCase(value);
@@ -94,45 +121,53 @@ function getPromptBatchId(prompt: string) {
   return match?.[0] ?? null;
 }
 
-function getFollowUpPrompt(intent: string, activeBatchId: string | null) {
+function getFollowUpPrompt(
+  intent: string,
+  activeBatchId: string | null,
+  t: (key: string, values?: Record<string, string | number>) => string
+) {
   const fallbackBatchId = activeBatchId ?? "RICE-001";
 
   switch (intent) {
     case "create_batch":
-      return `Create a rice batch for Ravi in Tamil Nadu with batch ID ${fallbackBatchId}`;
+      return t("assistant.promptCreate", { batchId: fallbackBatchId });
     case "add_block":
-      return `Add shipped event for batch ${fallbackBatchId}`;
+      return t("assistant.promptAddEvent", { batchId: fallbackBatchId });
     case "validate_chain":
     case "tamper_check":
-      return `Validate batch ${fallbackBatchId}`;
+      return t("assistant.promptValidate", { batchId: fallbackBatchId });
     case "get_batch_details":
     case "explain_batch":
     case "translate_explain":
     case "voice_explain":
-      return `Explain batch ${fallbackBatchId}`;
+      return t("assistant.promptExplain", { batchId: fallbackBatchId });
     default:
       return null;
   }
 }
 
-function buildSuggestedPrompts(response: AIResponse | null, activeBatchId: string | null) {
+function buildSuggestedPrompts(
+  response: AIResponse | null,
+  activeBatchId: string | null,
+  t: (key: string, values?: Record<string, string | number>) => string
+) {
   const prompts: string[] = [];
-  const followUpPrompt = getFollowUpPrompt(response?.intent ?? "unknown", activeBatchId);
+  const followUpPrompt = getFollowUpPrompt(response?.intent ?? "unknown", activeBatchId, t);
 
   if (followUpPrompt) {
     prompts.push(followUpPrompt);
   }
 
   if (activeBatchId) {
-    prompts.push(`Explain batch ${activeBatchId}`);
-    prompts.push(`Validate batch ${activeBatchId}`);
-    prompts.push(`Show batch ${activeBatchId} details`);
-    prompts.push(`Add shipped event for batch ${activeBatchId}`);
+    prompts.push(t("assistant.promptExplain", { batchId: activeBatchId }));
+    prompts.push(t("assistant.promptValidate", { batchId: activeBatchId }));
+    prompts.push(t("assistant.promptShow", { batchId: activeBatchId }));
+    prompts.push(t("assistant.promptAddEvent", { batchId: activeBatchId }));
   } else {
-    prompts.push("Create a rice batch for Ravi in Tamil Nadu with batch ID RICE-001");
-    prompts.push("Show my dashboard summary");
-    prompts.push("How many batches are currently tracked?");
-    prompts.push("Search history");
+    prompts.push(t("assistant.promptCreate", { batchId: "RICE-001" }));
+    prompts.push(t("assistant.promptDashboard"));
+    prompts.push(t("assistant.promptCount"));
+    prompts.push(t("assistant.promptHistory"));
   }
 
   return Array.from(new Set(prompts)).slice(0, 4);
@@ -233,20 +268,15 @@ function getSpeechRecognitionConstructor() {
   return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition ?? null;
 }
 
-function getSpeechLanguage(language: string) {
-  return assistantLanguageOptions.find((option) => option.value === language)?.speechLocale ?? "en-US";
+function getSpeechLanguage(
+  language: string,
+  options: ReadonlyArray<{ value: string; speechLocale: string }>
+) {
+  return options.find((option) => option.value === language)?.speechLocale ?? "en-US";
 }
 
-const assistantLanguageOptions = [
-  { value: "en", label: "English", speechLocale: "en-US" },
-  { value: "ta", label: "Tamil", speechLocale: "ta-IN" },
-  { value: "hi", label: "Hindi", speechLocale: "hi-IN" },
-  { value: "es", label: "Spanish", speechLocale: "es-ES" },
-  { value: "fr", label: "French", speechLocale: "fr-FR" },
-  { value: "ar", label: "Arabic", speechLocale: "ar-SA" }
-] as const;
-
 export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
+  const { language, languages, setLanguagePreference, t } = useLanguage();
   const router = useRouter();
   const reactId = useId();
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -258,7 +288,6 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
   const [messages, setMessages] = useState<AIChatMessage[]>([]);
   const [query, setQuery] = useState("");
   const [batchId, setBatchId] = useState(initialBatchId);
-  const [language, setLanguage] = useState("en");
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [responseStyle, setResponseStyle] = useState<AIResponseStyle>("brief");
   const [isLoading, setIsLoading] = useState(false);
@@ -306,16 +335,16 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
   const activeBatchId = useMemo(() => batchId.trim() || getBatchIdFromResponse(lastResponse) || null, [batchId, lastResponse]);
   const pendingFollowUpContext = useMemo(() => getPendingFollowUpContext(lastResponse), [lastResponse]);
   const suggestedPrompts = useMemo(
-    () => buildSuggestedPrompts(lastResponse, activeBatchId),
-    [activeBatchId, lastResponse]
+    () => buildSuggestedPrompts(lastResponse, activeBatchId, t),
+    [activeBatchId, lastResponse, t]
   );
   const activeFollowUpQuestion =
     lastResponse?.requires_user_action && lastResponse.follow_up_question ? lastResponse.follow_up_question : null;
   const queryPlaceholder = activeFollowUpQuestion
     ? activeFollowUpQuestion
     : activeBatchId
-      ? `Ask about ${activeBatchId}, validate it, or add the next event.`
-      : "Create a batch, ask where it came from, or validate a chain.";
+      ? t("assistant.placeholderWithBatch", { batchId: activeBatchId })
+      : t("assistant.placeholderWithoutBatch");
 
   const applyPrompt = (prompt: string) => {
     const promptBatchId = getPromptBatchId(prompt);
@@ -339,13 +368,13 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
     const SpeechRecognition = getSpeechRecognitionConstructor();
 
     if (!SpeechRecognition) {
-      setSpeechError("Speech-to-text is not supported in this browser.");
+      setSpeechError(t("assistant.speechUnsupported"));
       return;
     }
 
     recognitionRef.current?.abort();
     const recognition = new SpeechRecognition();
-    recognition.lang = getSpeechLanguage(language);
+    recognition.lang = getSpeechLanguage(language, languages);
     recognition.continuous = true;
     recognition.interimResults = true;
 
@@ -387,7 +416,7 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
 
     recognition.onerror = (event) => {
       if (event.error !== "no-speech" && event.error !== "aborted") {
-        setSpeechError(`Speech input stopped: ${event.error}.`);
+        setSpeechError(t("assistant.speechStopped", { error: event.error }));
       }
 
       speechShouldRestartRef.current = false;
@@ -411,7 +440,7 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
       recognition.start();
       recognitionRef.current = recognition;
     } catch {
-      setSpeechError("Speech input could not be started.");
+      setSpeechError(t("assistant.speechUnsupported"));
       setIsListening(false);
     }
   };
@@ -505,7 +534,7 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
 
       setMessages((current) => [...current, assistantMessage]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "The assistant request could not be completed.";
+      const message = error instanceof Error ? error.message : t("assistant.requestFailed");
 
       setActionError(message);
       setLastAction("SHOW_ERROR");
@@ -528,26 +557,32 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
       <div className={cn("glass-panel flex flex-col p-6 lg:p-8", isSimpleMode ? "min-h-[640px]" : "min-h-[720px]")}>
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 pb-5">
           <div className="space-y-3">
-            <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">Finca AI Assistant</p>
+            <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">{t("assistant.eyebrow")}</p>
             <h1 className="text-3xl font-semibold text-black">
-              {isSimpleMode ? "Ask in plain language." : "Ask about provenance, trust, and verification."}
+              {isSimpleMode ? t("assistant.titleSimple") : t("assistant.titleFull")}
             </h1>
             <p className="max-w-2xl text-sm leading-7 text-black/68">
               {isSimpleMode
-                ? "Use one box to ask where a batch came from, validate it, or add the next real-world update."
-                : "This module sends your question to /api/ai, reads the structured response, and updates the UI instantly."}
+                ? t("assistant.descriptionSimple")
+                : t("assistant.descriptionFull")}
             </p>
           </div>
 
           <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-4">
             <p className="text-xs uppercase tracking-[0.24em] text-black/45">
-              {isSimpleMode ? "Current batch" : "Current context"}
+              {isSimpleMode ? t("assistant.currentBatch") : t("assistant.currentContext")}
             </p>
             <p className="mt-2 text-sm font-semibold text-black">
-              {activeBatchId ? `Working on ${activeBatchId}` : isSimpleMode ? "No batch selected" : "No batch pinned yet"}
+              {activeBatchId
+                ? t("assistant.workingOn", { batchId: activeBatchId })
+                : isSimpleMode
+                  ? t("assistant.noBatchSelected")
+                  : t("assistant.noBatchPinned")}
             </p>
             <p className="mt-2 text-xs text-black/50">
-              {isSimpleMode ? assistantLanguageOptions.find((option) => option.value === language)?.label : getReadableActionLabel(lastAction)}
+              {isSimpleMode
+                ? languages.find((option) => option.value === language)?.nativeLabel
+                : getReadableActionLabel(lastAction, t("assistant.waitingResponse"), t)}
             </p>
           </div>
         </div>
@@ -560,11 +595,13 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
                   <Sparkles className="h-4 w-4" />
                 </span>
                 <div>
-                  <p className="text-sm font-semibold text-black">{isSimpleMode ? "Assistant ready" : "Interpreter ready"}</p>
+                  <p className="text-sm font-semibold text-black">
+                    {isSimpleMode ? t("assistant.assistantReady") : t("assistant.interpreterReady")}
+                  </p>
                   <p className="text-sm leading-7 text-black/65">
                     {isSimpleMode
-                      ? "Try a simple question like where a batch came from, whether it is verified, or what event to add next."
-                      : "Ask where a batch came from, request verification, or ask the assistant to open a related view."}
+                      ? t("assistant.readyDescriptionSimple")
+                      : t("assistant.readyDescriptionFull")}
                   </p>
                 </div>
               </div>
@@ -603,7 +640,7 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
                   </span>
                   <div className="flex items-center gap-2 text-sm">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Waiting for structured assistant response
+                    {t("assistant.waitingResponse")}
                   </div>
                 </div>
               </div>
@@ -615,7 +652,7 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
         <form onSubmit={submitQuery} className="mt-6 space-y-4 border-t border-black/10 pt-5">
           {activeFollowUpQuestion ? (
             <div className="rounded-[24px] border border-finca-gold/20 bg-finca-gold/10 p-4">
-              <p className="text-xs uppercase tracking-[0.22em] text-black/45">Follow-up needed</p>
+              <p className="text-xs uppercase tracking-[0.22em] text-black/45">{t("assistant.followUpNeeded")}</p>
               <p className="mt-2 text-sm leading-7 text-black/72">{activeFollowUpQuestion}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {suggestedPrompts.slice(0, 2).map((prompt) => (
@@ -634,21 +671,21 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
 
           <div className={cn("grid gap-4", isSimpleMode ? "lg:grid-cols-[1fr_180px_180px]" : "lg:grid-cols-[1fr_170px_150px_150px]")}>
             <label className="space-y-2">
-              <span className="text-sm font-medium text-black/80">Batch context</span>
+              <span className="text-sm font-medium text-black/80">{t("assistant.batchContext")}</span>
               <input
                 value={batchId}
                 onChange={(event) => setBatchId(event.target.value)}
                 className="input-shell"
-                placeholder="Optional batch ID"
+                placeholder={t("assistant.batchContextPlaceholder")}
               />
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-black/80">{isSimpleMode ? "Language and mic" : "Language"}</span>
-              <select value={language} onChange={(event) => setLanguage(event.target.value)} className="input-shell">
-                {assistantLanguageOptions.map((option) => (
+              <span className="text-sm font-medium text-black/80">{isSimpleMode ? t("assistant.languageAndMic") : t("assistant.language")}</span>
+              <select value={language} onChange={(event) => setLanguagePreference(event.target.value as typeof language)} className="input-shell">
+                {languages.map((option) => (
                   <option key={option.value} value={option.value}>
-                    {option.label}
+                    {option.nativeLabel}
                   </option>
                 ))}
               </select>
@@ -656,21 +693,21 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
 
             {!isSimpleMode ? (
               <label className="space-y-2">
-                <span className="text-sm font-medium text-black/80">Style</span>
+                <span className="text-sm font-medium text-black/80">{t("assistant.style")}</span>
                 <select
                   value={responseStyle}
                   onChange={(event) => setResponseStyle(event.target.value as AIResponseStyle)}
                   className="input-shell"
                 >
-                  <option value="brief">Brief</option>
-                  <option value="balanced">Balanced</option>
-                  <option value="detailed">Detailed</option>
+                  <option value="brief">{t("assistant.brief")}</option>
+                  <option value="balanced">{t("assistant.balanced")}</option>
+                  <option value="detailed">{t("assistant.detailed")}</option>
                 </select>
               </label>
             ) : null}
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-black/80">{isSimpleMode ? "Audio reply" : "Voice"}</span>
+              <span className="text-sm font-medium text-black/80">{isSimpleMode ? t("assistant.audioReply") : t("assistant.voice")}</span>
               <button
                 type="button"
                 onClick={() => setVoiceEnabled((current) => !current)}
@@ -679,7 +716,7 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
                   voiceEnabled && "border-black/20 bg-black/[0.05]"
                 )}
               >
-                <span>{voiceEnabled ? "Audio reply on" : "Audio reply off"}</span>
+                <span>{voiceEnabled ? t("assistant.audioOn") : t("assistant.audioOff")}</span>
                 <Volume2 className="h-4 w-4" />
               </button>
             </label>
@@ -710,7 +747,7 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
                   isListening && "border-finca-mint/35 bg-finca-mint/10 text-black"
                 )}
               >
-                {isListening ? "Stop mic" : "Speak"}
+                {isListening ? t("assistant.stopMic") : t("assistant.speak")}
                 {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
               </button>
 
@@ -719,7 +756,7 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
                 disabled={isLoading || !query.trim()}
                 className="button-primary h-full min-h-[52px] gap-2 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isLoading ? "Sending..." : "Send"}
+                {isLoading ? t("assistant.sending") : t("assistant.send")}
                 <SendHorizontal className="h-4 w-4" />
               </button>
             </div>
@@ -732,8 +769,7 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
           ) : null}
 
           <div className="rounded-2xl border border-black/10 bg-black/[0.03] px-4 py-3 text-sm text-black/68">
-            Speech to text works with English, Tamil, Hindi, Spanish, French, and Arabic. The selected language also
-            drives the microphone input.
+            {t("assistant.speechHint")}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -754,45 +790,41 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
       {!isSimpleMode ? (
         <div className="space-y-6">
         <div className="glass-panel p-6 lg:p-8">
-          <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">Assistant guide</p>
+          <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">{t("assistant.assistantGuide")}</p>
           <div className="mt-5 grid gap-4">
             <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-5">
-              <p className="text-xs uppercase tracking-[0.24em] text-black/45">Current batch</p>
-              <p className="mt-2 text-3xl font-semibold text-black">{activeBatchId ?? "None"}</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-black/45">{t("assistant.currentBatch")}</p>
+              <p className="mt-2 text-3xl font-semibold text-black">{activeBatchId ?? t("common.none")}</p>
               <p className="mt-2 text-sm text-black/65">
-                The assistant keeps using this batch until you switch it or a newer batch is returned.
+                {t("assistant.latestActionDesc")}
               </p>
             </div>
             <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-5">
-              <p className="text-xs uppercase tracking-[0.24em] text-black/45">Latest action</p>
-              <p className="mt-2 text-lg font-semibold text-black">{getReadableActionLabel(lastAction)}</p>
-              <p className="mt-2 text-sm leading-7 text-black/65">
-                Follow-ups stay in the chat flow, while successful actions can update the current batch context automatically.
-              </p>
-            </div>
-            <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-5">
-              <p className="text-xs uppercase tracking-[0.24em] text-black/45">Speech to text</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-black/45">{t("assistant.latestAction")}</p>
               <p className="mt-2 text-lg font-semibold text-black">
-                {speechSupported ? (isListening ? "Listening now" : "Mic ready") : "Browser not supported"}
+                {getReadableActionLabel(lastAction, t("assistant.waitingResponse"), t)}
               </p>
-              <p className="mt-2 text-sm leading-7 text-black/65">
-                The mic button uses browser speech recognition to fill the query box before sending anything to `/api/ai`.
-              </p>
+              <p className="mt-2 text-sm leading-7 text-black/65">{t("assistant.latestActionDesc")}</p>
             </div>
             <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-5">
-              <p className="text-xs uppercase tracking-[0.24em] text-black/45">Reply mode</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-black/45">{t("assistant.speechToText")}</p>
               <p className="mt-2 text-lg font-semibold text-black">
-                {toTitleCase(responseStyle)} · {voiceEnabled ? "Audio on" : "Audio off"}
+                {speechSupported ? (isListening ? t("assistant.listeningNow") : t("assistant.micReady")) : t("assistant.browserNotSupported")}
               </p>
-              <p className="mt-2 text-sm leading-7 text-black/65">
-                Use brief for quick actions or detailed when you want a fuller batch explanation.
+              <p className="mt-2 text-sm leading-7 text-black/65">{t("assistant.speechDesc")}</p>
+            </div>
+            <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-5">
+              <p className="text-xs uppercase tracking-[0.24em] text-black/45">{t("assistant.replyMode")}</p>
+              <p className="mt-2 text-lg font-semibold text-black">
+                {toTitleCase(responseStyle)} · {voiceEnabled ? t("assistant.audioOn") : t("assistant.audioOff")}
               </p>
+              <p className="mt-2 text-sm leading-7 text-black/65">{t("assistant.replyModeDesc")}</p>
             </div>
           </div>
         </div>
 
         <div className="glass-panel p-6 lg:p-8">
-          <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">Suggested next asks</p>
+          <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">{t("assistant.suggestedNextAsks")}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {suggestedPrompts.map((prompt) => (
               <button
@@ -816,26 +848,24 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
             )}
           >
             <div className="space-y-3">
-              <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">Verification result</p>
+              <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">{t("assistant.verificationResult")}</p>
               <h2 className="text-2xl font-semibold text-black">
                 {validationFlag === true
-                  ? "Chain verified"
+                  ? t("validation.verified")
                   : validationFlag === false
-                    ? "Integrity compromised"
-                    : "Validation response received"}
+                    ? t("validation.compromised")
+                    : t("assistant.verificationResult")}
               </h2>
-              <p className="text-sm leading-7 text-black/68">
-                This panel is shown only because the backend returned the
-                <span className="font-semibold text-black"> SHOW_VERIFICATION_RESULT </span>
-                action.
-              </p>
+              <p className="text-sm leading-7 text-black/68">{t("assistant.verificationResultDesc")}</p>
             </div>
 
             <div className="mt-5 grid gap-3">
               {validationEntries.map(([key, value]) => (
                 <div key={key} className="rounded-[22px] border border-black/10 bg-black/[0.03] p-4">
                   <p className="text-xs uppercase tracking-[0.22em] text-black/45">{key.replace(/_/g, " ")}</p>
-                  <p className="mt-2 break-words text-sm leading-7 text-black/75">{renderValue(value)}</p>
+                  <p className="mt-2 break-words text-sm leading-7 text-black/75">
+                    {renderValue(value, t("common.notProvided"))}
+                  </p>
                 </div>
               ))}
             </div>
@@ -844,7 +874,7 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
 
         {actionError ? (
           <div className="glass-panel border-finca-ember/30 p-6 lg:p-8">
-            <p className="text-sm uppercase tracking-[0.28em] text-finca-ember">Interpreter error</p>
+            <p className="text-sm uppercase tracking-[0.28em] text-finca-ember">{t("assistant.interpreterError")}</p>
             <p className="mt-3 text-sm leading-7 text-black/72">{actionError}</p>
           </div>
         ) : null}
@@ -856,14 +886,14 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
               onClick={() => setShowDebug((current) => !current)}
               className="flex w-full items-center justify-between text-left"
             >
-              <span className="text-sm uppercase tracking-[0.28em] text-finca-gold">Debug details</span>
-              <span className="text-xs text-black/50">{showDebug ? "Hide" : "Show"}</span>
+              <span className="text-sm uppercase tracking-[0.28em] text-finca-gold">{t("assistant.debugDetails")}</span>
+              <span className="text-xs text-black/50">{showDebug ? t("common.hide") : t("common.show")}</span>
             </button>
 
             {showDebug ? (
               <div className="mt-4 space-y-4">
                 <div className="rounded-[22px] border border-black/10 bg-black/[0.03] p-4">
-                  <p className="text-xs uppercase tracking-[0.22em] text-black/45">Session</p>
+                  <p className="text-xs uppercase tracking-[0.22em] text-black/45">{t("assistant.session")}</p>
                   <p className="mt-2 break-all text-sm leading-7 text-black/75">{sessionId}</p>
                 </div>
 
@@ -872,7 +902,9 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
                     {Object.entries(lastResponse.router_plan).map(([key, value]) => (
                       <div key={key} className="rounded-[22px] border border-black/10 bg-black/[0.03] p-4">
                         <p className="text-xs uppercase tracking-[0.22em] text-black/45">{key.replace(/_/g, " ")}</p>
-                        <p className="mt-2 break-words text-sm leading-7 text-black/75">{renderValue(value)}</p>
+                        <p className="mt-2 break-words text-sm leading-7 text-black/75">
+                          {renderValue(value, t("common.notProvided"))}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -880,7 +912,7 @@ export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
 
                 {lastResponse?.warnings?.length ? (
                   <div className="space-y-3">
-                    <p className="text-xs uppercase tracking-[0.22em] text-black/45">Warnings</p>
+                    <p className="text-xs uppercase tracking-[0.22em] text-black/45">{t("assistant.warnings")}</p>
                     {lastResponse.warnings.map((warning, index) => (
                       <div
                         key={`${warning}-${index}`}

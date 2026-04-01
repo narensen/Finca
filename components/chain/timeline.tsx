@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Clock3, MapPin, UserCircle2 } from "lucide-react";
 
+import { useLanguage } from "@/components/providers/language-provider";
 import { cn, formatDateTime, getBlockActor, getBlockHeadline, getBlockLocation, getBlockNarrative } from "@/lib/utils";
 import type { Batch, Block } from "@/lib/types";
 
@@ -15,14 +16,13 @@ interface TimelineProps {
 }
 
 export function Timeline({ batch, blocks, activeIndex, invalidIndex = null, onSelect }: TimelineProps) {
+  const { t } = useLanguage();
   return (
     <div className="glass-panel p-6 lg:p-7">
       <div className="mb-6">
-        <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">Timeline view</p>
-        <h3 className="mt-3 text-2xl font-semibold text-black">Human-readable custody trail</h3>
-        <p className="mt-3 max-w-xl text-sm leading-7 text-black/65">
-          Click any event to synchronize the chain view with the same moment in the journey.
-        </p>
+        <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">{t("timeline.eyebrow")}</p>
+        <h3 className="mt-3 text-2xl font-semibold text-black">{t("timeline.title")}</h3>
+        <p className="mt-3 max-w-xl text-sm leading-7 text-black/65">{t("timeline.description")}</p>
       </div>
 
       <div className="relative pl-7">
@@ -58,7 +58,7 @@ export function Timeline({ batch, blocks, activeIndex, invalidIndex = null, onSe
 
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="rounded-full border border-black/10 bg-black/[0.03] px-3 py-1 text-xs uppercase tracking-[0.24em] text-black/55">
-                    Block {block.index}
+                    {t("timeline.block")} {block.index}
                   </span>
                   <span className="rounded-full border border-black/10 bg-black/[0.03] px-3 py-1 text-xs uppercase tracking-[0.24em] text-finca-lime">
                     {getBlockHeadline(block)}
