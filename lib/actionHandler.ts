@@ -91,6 +91,11 @@ export function handleAssistantAction({
       return;
 
     case "SHOW_ERROR":
+      if (response.requires_user_action || response.follow_up_question) {
+        setError(null);
+        return;
+      }
+
       setError(response.assistant_message || "The assistant reported an error.");
       return;
 

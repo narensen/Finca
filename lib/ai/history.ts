@@ -11,6 +11,7 @@ function mapHistoryRow(row: AIRouterHistoryRow): AIHistoryEntry {
       typeof row.api_result_summary === "string" && row.api_result_summary.trim()
         ? row.api_result_summary
         : row.assistant_message,
+    user_query: row.user_query,
     batch_id: typeof metadata.batch_id === "string" ? metadata.batch_id : null,
     event_type: typeof metadata.event_type === "string" ? metadata.event_type : null,
     hash: typeof metadata.hash === "string" ? metadata.hash : null

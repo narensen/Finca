@@ -2,14 +2,14 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, ChevronDown, ChevronUp, Loader2, Mic, MicOff, SendHorizontal, Sparkles, Volume2 } from "lucide-react";
+import { Bot, Loader2, Mic, MicOff, SendHorizontal, Sparkles, Volume2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { ChatMessage } from "@/components/ChatMessage";
 import { handleAssistantAction } from "@/lib/actionHandler";
 import { sendAIQuery } from "@/lib/aiClient";
 import { cn, toTitleCase } from "@/lib/utils";
-import type { AIChatMessage, AIQueryRequest, AIResponse, AIResponseStyle } from "@/lib/types";
+import type { AIChatMessage, AIQueryContext, AIQueryRequest, AIResponse, AIResponseStyle } from "@/lib/types";
 
 function createMessageId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -138,8 +138,48 @@ function buildSuggestedPrompts(response: AIResponse | null, activeBatchId: strin
   return Array.from(new Set(prompts)).slice(0, 4);
 }
 
+function getPendingFollowUpContext(response: AIResponse | null): AIQueryContext {
+  if (!response?.requires_user_action) {
+    return {};
+  }
+
+  const payloadCandidate = response.router_plan?.api_calls?.find(
+    (call) => call.payload && typeof call.payload === "object" && !Array.isArray(call.payload)
+  )?.payload;
+
+  if (!payloadCandidate || typeof payloadCandidate !== "object" || Array.isArray(payloadCandidate)) {
+    return {};
+  }
+
+  const payload = payloadCandidate as Record<string, unknown>;
+  const payloadData =
+    payload.data && typeof payload.data === "object" && !Array.isArray(payload.data)
+      ? (payload.data as Record<string, unknown>)
+      : undefined;
+
+  return {
+    ...(typeof payload.batch_id === "string" && payload.batch_id.trim()
+      ? { batch_id: payload.batch_id }
+      : {}),
+    ...(typeof payload.crop_name === "string" && payload.crop_name.trim()
+      ? { crop_name: payload.crop_name }
+      : {}),
+    ...(typeof payload.farmer_name === "string" && payload.farmer_name.trim()
+      ? { farmer_name: payload.farmer_name }
+      : {}),
+    ...(typeof payload.farm_location === "string" && payload.farm_location.trim()
+      ? { farm_location: payload.farm_location }
+      : {}),
+    ...(typeof payload.event_type === "string" && payload.event_type.trim()
+      ? { event_type: payload.event_type }
+      : {}),
+    ...(payloadData && Object.keys(payloadData).length > 0 ? { data: payloadData } : {})
+  };
+}
+
 interface AIChatProps {
   initialBatchId?: string;
+  mode?: "full" | "simple";
 }
 
 interface BrowserSpeechRecognitionAlternative {
@@ -206,7 +246,7 @@ const assistantLanguageOptions = [
   { value: "ar", label: "Arabic", speechLocale: "ar-SA" }
 ] as const;
 
-export function AIChat({ initialBatchId = "" }: AIChatProps) {
+export function AIChat({ initialBatchId = "", mode = "full" }: AIChatProps) {
   const router = useRouter();
   const reactId = useId();
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -230,6 +270,7 @@ export function AIChat({ initialBatchId = "" }: AIChatProps) {
   const [lastAction, setLastAction] = useState<string | null>(null);
   const [lastResponse, setLastResponse] = useState<AIResponse | null>(null);
   const [showDebug, setShowDebug] = useState(false);
+  const isSimpleMode = mode === "simple";
 
   useEffect(() => {
     setSpeechSupported(Boolean(getSpeechRecognitionConstructor()));
@@ -263,6 +304,7 @@ export function AIChat({ initialBatchId = "" }: AIChatProps) {
   const validationFlag = useMemo(() => getValidationFlag(validationResult), [validationResult]);
   const validationEntries = useMemo(() => Object.entries(validationResult ?? {}), [validationResult]);
   const activeBatchId = useMemo(() => batchId.trim() || getBatchIdFromResponse(lastResponse) || null, [batchId, lastResponse]);
+  const pendingFollowUpContext = useMemo(() => getPendingFollowUpContext(lastResponse), [lastResponse]);
   const suggestedPrompts = useMemo(
     () => buildSuggestedPrompts(lastResponse, activeBatchId),
     [activeBatchId, lastResponse]
@@ -398,22 +440,32 @@ export function AIChat({ initialBatchId = "" }: AIChatProps) {
     setIsLoading(true);
     setActionError(null);
 
+    const effectiveBatchId =
+      activeBatchId ||
+      (typeof pendingFollowUpContext.batch_id === "string" ? pendingFollowUpContext.batch_id.trim() : "");
+    const requestContext: AIQueryContext = {
+      ...pendingFollowUpContext,
+      ...(effectiveBatchId
+        ? {
+            batch_id: effectiveBatchId
+          }
+        : {})
+    };
+
     const payload: AIQueryRequest = {
       query: trimmedQuery,
       session_id: sessionId,
       language,
       voice_mode: voiceEnabled,
       response_style: responseStyle,
-      ...(batchId.trim()
+      ...(effectiveBatchId
         ? {
-            batch_id: batchId.trim()
+            batch_id: effectiveBatchId
           }
         : {}),
-      ...(batchId.trim()
+      ...(Object.keys(requestContext).length > 0
         ? {
-            context: {
-              batch_id: batchId.trim()
-            }
+            context: requestContext
           }
         : {})
     };
@@ -472,22 +524,31 @@ export function AIChat({ initialBatchId = "" }: AIChatProps) {
   };
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-      <div className="glass-panel flex min-h-[720px] flex-col p-6 lg:p-8">
+    <div className={cn("grid gap-6", !isSimpleMode && "xl:grid-cols-[1.15fr_0.85fr]")}>
+      <div className={cn("glass-panel flex flex-col p-6 lg:p-8", isSimpleMode ? "min-h-[640px]" : "min-h-[720px]")}>
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 pb-5">
           <div className="space-y-3">
             <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">Finca AI Assistant</p>
-            <h1 className="text-3xl font-semibold text-black">Ask about provenance, trust, and verification.</h1>
+            <h1 className="text-3xl font-semibold text-black">
+              {isSimpleMode ? "Ask in plain language." : "Ask about provenance, trust, and verification."}
+            </h1>
             <p className="max-w-2xl text-sm leading-7 text-black/68">
-              This module sends your question to <span className="font-semibold text-black">/api/ai</span>, reads the
-              structured response, and updates the UI instantly.
+              {isSimpleMode
+                ? "Use one box to ask where a batch came from, validate it, or add the next real-world update."
+                : "This module sends your question to /api/ai, reads the structured response, and updates the UI instantly."}
             </p>
           </div>
 
           <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-4">
-            <p className="text-xs uppercase tracking-[0.24em] text-black/45">Latest action</p>
-            <p className="mt-2 text-sm font-semibold text-black">{lastAction ?? "Waiting for assistant response"}</p>
-            <p className="mt-2 text-xs text-black/50">Session {sessionId}</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-black/45">
+              {isSimpleMode ? "Current batch" : "Current context"}
+            </p>
+            <p className="mt-2 text-sm font-semibold text-black">
+              {activeBatchId ? `Working on ${activeBatchId}` : isSimpleMode ? "No batch selected" : "No batch pinned yet"}
+            </p>
+            <p className="mt-2 text-xs text-black/50">
+              {isSimpleMode ? assistantLanguageOptions.find((option) => option.value === language)?.label : getReadableActionLabel(lastAction)}
+            </p>
           </div>
         </div>
 
@@ -499,11 +560,26 @@ export function AIChat({ initialBatchId = "" }: AIChatProps) {
                   <Sparkles className="h-4 w-4" />
                 </span>
                 <div>
-                  <p className="text-sm font-semibold text-black">Interpreter ready</p>
+                  <p className="text-sm font-semibold text-black">{isSimpleMode ? "Assistant ready" : "Interpreter ready"}</p>
                   <p className="text-sm leading-7 text-black/65">
-                    Ask where a batch came from, request verification, or ask the assistant to open a related view.
+                    {isSimpleMode
+                      ? "Try a simple question like where a batch came from, whether it is verified, or what event to add next."
+                      : "Ask where a batch came from, request verification, or ask the assistant to open a related view."}
                   </p>
                 </div>
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                {suggestedPrompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => applyPrompt(prompt)}
+                    className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-black/75 transition duration-300 hover:border-black/25 hover:bg-black/[0.03] hover:text-black"
+                  >
+                    {prompt}
+                  </button>
+                ))}
               </div>
             </div>
           ) : null}
@@ -537,7 +613,26 @@ export function AIChat({ initialBatchId = "" }: AIChatProps) {
         </div>
 
         <form onSubmit={submitQuery} className="mt-6 space-y-4 border-t border-black/10 pt-5">
-          <div className="grid gap-4 lg:grid-cols-[1fr_170px_150px_150px]">
+          {activeFollowUpQuestion ? (
+            <div className="rounded-[24px] border border-finca-gold/20 bg-finca-gold/10 p-4">
+              <p className="text-xs uppercase tracking-[0.22em] text-black/45">Follow-up needed</p>
+              <p className="mt-2 text-sm leading-7 text-black/72">{activeFollowUpQuestion}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {suggestedPrompts.slice(0, 2).map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => applyPrompt(prompt)}
+                    className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-black/75 transition duration-300 hover:border-black/25 hover:bg-black/[0.03] hover:text-black"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className={cn("grid gap-4", isSimpleMode ? "lg:grid-cols-[1fr_180px_180px]" : "lg:grid-cols-[1fr_170px_150px_150px]")}>
             <label className="space-y-2">
               <span className="text-sm font-medium text-black/80">Batch context</span>
               <input
@@ -549,7 +644,7 @@ export function AIChat({ initialBatchId = "" }: AIChatProps) {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-black/80">Language</span>
+              <span className="text-sm font-medium text-black/80">{isSimpleMode ? "Language and mic" : "Language"}</span>
               <select value={language} onChange={(event) => setLanguage(event.target.value)} className="input-shell">
                 {assistantLanguageOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -559,21 +654,23 @@ export function AIChat({ initialBatchId = "" }: AIChatProps) {
               </select>
             </label>
 
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-black/80">Style</span>
-              <select
-                value={responseStyle}
-                onChange={(event) => setResponseStyle(event.target.value as AIResponseStyle)}
-                className="input-shell"
-              >
-                <option value="brief">Brief</option>
-                <option value="balanced">Balanced</option>
-                <option value="detailed">Detailed</option>
-              </select>
-            </label>
+            {!isSimpleMode ? (
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-black/80">Style</span>
+                <select
+                  value={responseStyle}
+                  onChange={(event) => setResponseStyle(event.target.value as AIResponseStyle)}
+                  className="input-shell"
+                >
+                  <option value="brief">Brief</option>
+                  <option value="balanced">Balanced</option>
+                  <option value="detailed">Detailed</option>
+                </select>
+              </label>
+            ) : null}
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-black/80">Voice</span>
+              <span className="text-sm font-medium text-black/80">{isSimpleMode ? "Audio reply" : "Voice"}</span>
               <button
                 type="button"
                 onClick={() => setVoiceEnabled((current) => !current)}
@@ -590,10 +687,11 @@ export function AIChat({ initialBatchId = "" }: AIChatProps) {
 
           <div className="flex gap-3">
             <textarea
+              ref={queryRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               className="input-shell min-h-[108px] flex-1 resize-y"
-              placeholder="Where did this batch come from, and is the chain verified?"
+              placeholder={queryPlaceholder}
             />
             <div className="flex min-w-[148px] flex-col gap-3">
               <button
@@ -632,22 +730,44 @@ export function AIChat({ initialBatchId = "" }: AIChatProps) {
               {speechError}
             </div>
           ) : null}
+
+          <div className="rounded-2xl border border-black/10 bg-black/[0.03] px-4 py-3 text-sm text-black/68">
+            Speech to text works with English, Tamil, Hindi, Spanish, French, and Arabic. The selected language also
+            drives the microphone input.
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {suggestedPrompts.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => applyPrompt(prompt)}
+                className="rounded-full border border-black/10 bg-black/[0.03] px-4 py-2 text-sm text-black/75 transition duration-300 hover:border-black/25 hover:bg-white hover:text-black"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
         </form>
       </div>
 
-      <div className="space-y-6">
+      {!isSimpleMode ? (
+        <div className="space-y-6">
         <div className="glass-panel p-6 lg:p-8">
-          <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">Interpreter state</p>
+          <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">Assistant guide</p>
           <div className="mt-5 grid gap-4">
             <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-5">
-              <p className="text-xs uppercase tracking-[0.24em] text-black/45">Message count</p>
-              <p className="mt-2 text-3xl font-semibold text-black">{messages.length}</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-black/45">Current batch</p>
+              <p className="mt-2 text-3xl font-semibold text-black">{activeBatchId ?? "None"}</p>
+              <p className="mt-2 text-sm text-black/65">
+                The assistant keeps using this batch until you switch it or a newer batch is returned.
+              </p>
             </div>
             <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-5">
-              <p className="text-xs uppercase tracking-[0.24em] text-black/45">Audio reply</p>
-              <p className="mt-2 text-lg font-semibold text-black">{voiceEnabled ? "Autoplay enabled" : "Manual playback"}</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-black/45">Latest action</p>
+              <p className="mt-2 text-lg font-semibold text-black">{getReadableActionLabel(lastAction)}</p>
               <p className="mt-2 text-sm leading-7 text-black/65">
-                If the backend returns an audio file, the player will load automatically and play when voice is enabled.
+                Follow-ups stay in the chat flow, while successful actions can update the current batch context automatically.
               </p>
             </div>
             <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-5">
@@ -660,29 +780,32 @@ export function AIChat({ initialBatchId = "" }: AIChatProps) {
               </p>
             </div>
             <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-5">
-              <p className="text-xs uppercase tracking-[0.24em] text-black/45">Response mode</p>
-              <p className="mt-2 text-lg font-semibold text-black">{responseStyle}</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-black/45">Reply mode</p>
+              <p className="mt-2 text-lg font-semibold text-black">
+                {toTitleCase(responseStyle)} · {voiceEnabled ? "Audio on" : "Audio off"}
+              </p>
               <p className="mt-2 text-sm leading-7 text-black/65">
-                This is sent directly as <span className="font-semibold text-black">response_style</span> in the
-                `/api/ai` request.
+                Use brief for quick actions or detailed when you want a fuller batch explanation.
               </p>
             </div>
           </div>
         </div>
 
-        {lastResponse?.router_plan ? (
-          <div className="glass-panel p-6 lg:p-8">
-            <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">Router plan</p>
-            <div className="mt-5 grid gap-3">
-              {Object.entries(lastResponse.router_plan).map(([key, value]) => (
-                <div key={key} className="rounded-[22px] border border-black/10 bg-black/[0.03] p-4">
-                  <p className="text-xs uppercase tracking-[0.22em] text-black/45">{key.replace(/_/g, " ")}</p>
-                  <p className="mt-2 break-words text-sm leading-7 text-black/75">{renderValue(value)}</p>
-                </div>
-              ))}
-            </div>
+        <div className="glass-panel p-6 lg:p-8">
+          <p className="text-sm uppercase tracking-[0.28em] text-finca-mint/70">Suggested next asks</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {suggestedPrompts.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => applyPrompt(prompt)}
+                className="rounded-full border border-black/10 bg-black/[0.03] px-4 py-2 text-sm text-black/75 transition duration-300 hover:border-black/25 hover:bg-white hover:text-black"
+              >
+                {prompt}
+              </button>
+            ))}
           </div>
-        ) : null}
+        </div>
 
         {validationResult ? (
           <div
@@ -726,19 +849,54 @@ export function AIChat({ initialBatchId = "" }: AIChatProps) {
           </div>
         ) : null}
 
-        {lastResponse?.warnings?.length ? (
+        {(lastResponse?.router_plan || lastResponse?.warnings?.length) ? (
           <div className="glass-panel p-6 lg:p-8">
-            <p className="text-sm uppercase tracking-[0.28em] text-finca-gold">Backend warnings</p>
-            <div className="mt-4 space-y-3">
-              {lastResponse.warnings.map((warning, index) => (
-                <div key={`${warning}-${index}`} className="rounded-[22px] border border-finca-gold/20 bg-finca-gold/10 p-4">
-                  <p className="text-sm leading-7 text-black/72">{warning}</p>
+            <button
+              type="button"
+              onClick={() => setShowDebug((current) => !current)}
+              className="flex w-full items-center justify-between text-left"
+            >
+              <span className="text-sm uppercase tracking-[0.28em] text-finca-gold">Debug details</span>
+              <span className="text-xs text-black/50">{showDebug ? "Hide" : "Show"}</span>
+            </button>
+
+            {showDebug ? (
+              <div className="mt-4 space-y-4">
+                <div className="rounded-[22px] border border-black/10 bg-black/[0.03] p-4">
+                  <p className="text-xs uppercase tracking-[0.22em] text-black/45">Session</p>
+                  <p className="mt-2 break-all text-sm leading-7 text-black/75">{sessionId}</p>
                 </div>
-              ))}
-            </div>
+
+                {lastResponse?.router_plan ? (
+                  <div className="grid gap-3">
+                    {Object.entries(lastResponse.router_plan).map(([key, value]) => (
+                      <div key={key} className="rounded-[22px] border border-black/10 bg-black/[0.03] p-4">
+                        <p className="text-xs uppercase tracking-[0.22em] text-black/45">{key.replace(/_/g, " ")}</p>
+                        <p className="mt-2 break-words text-sm leading-7 text-black/75">{renderValue(value)}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {lastResponse?.warnings?.length ? (
+                  <div className="space-y-3">
+                    <p className="text-xs uppercase tracking-[0.22em] text-black/45">Warnings</p>
+                    {lastResponse.warnings.map((warning, index) => (
+                      <div
+                        key={`${warning}-${index}`}
+                        className="rounded-[22px] border border-finca-gold/20 bg-finca-gold/10 p-4"
+                      >
+                        <p className="text-sm leading-7 text-black/72">{warning}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

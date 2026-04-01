@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Bot, User2, Workflow } from "lucide-react";
+import { Bot, User2 } from "lucide-react";
 
 import { VoicePlayer } from "@/components/VoicePlayer";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,6 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const assistant = message.role === "assistant";
-  const apiCalls = message.response?.api_calls_made ?? [];
 
   return (
     <motion.div
@@ -74,35 +73,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div className="rounded-[22px] border border-finca-gold/20 bg-finca-gold/10 p-4">
             <p className="text-xs uppercase tracking-[0.22em] text-black/45">Follow-up needed</p>
             <p className="mt-2 text-sm leading-7 text-black/72">{message.response.follow_up_question}</p>
-          </div>
-        ) : null}
-
-        {assistant && message.response?.warnings?.length ? (
-          <div className="rounded-[22px] border border-finca-gold/20 bg-finca-gold/10 p-4">
-            <p className="text-xs uppercase tracking-[0.22em] text-black/45">Warnings</p>
-            <div className="mt-2 space-y-2">
-              {message.response.warnings.map((warning, index) => (
-                <p key={`${warning}-${index}`} className="text-sm leading-7 text-black/72">
-                  {warning}
-                </p>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {assistant && apiCalls.length > 0 ? (
-          <div className="rounded-[22px] border border-black/10 bg-black/[0.03] p-4">
-            <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-black/45">
-              <Workflow className="h-3.5 w-3.5" />
-              API calls made
-            </div>
-            <div className="space-y-2">
-              {apiCalls.map((call, index) => (
-                <p key={`${call.method}-${call.endpoint}-${index}`} className="text-sm text-black/70">
-                  <span className="font-semibold text-black">{call.method}</span> {call.endpoint}
-                </p>
-              ))}
-            </div>
           </div>
         ) : null}
 

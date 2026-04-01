@@ -1,15 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Bot,
-  CheckCircle2,
-  CirclePlus,
-  LayoutDashboard,
-  Link2,
-  ShieldCheck,
-  Sparkles
-} from "lucide-react";
+import { ArrowRight, Bot, CirclePlus, LayoutDashboard, Link2, ShieldCheck, Sparkles } from "lucide-react";
 
 import { AIChat } from "@/components/AIChat";
 import { BatchGrid } from "@/components/dashboard/batch-grid";
@@ -36,109 +27,69 @@ export default async function HomePage() {
 
   return (
     <div className="pb-24">
-      <section className="section-shell pt-16 sm:pt-20 lg:pt-24">
-        <div className="glass-stage relative overflow-hidden p-5 sm:p-8 lg:p-10">
-          <div className="absolute -right-20 top-8 h-56 w-56 rounded-full bg-white/75 blur-3xl" />
-          <div className="absolute bottom-0 left-10 h-52 w-52 rounded-full bg-white/55 blur-3xl" />
-          <div className="relative grid items-start gap-10 xl:grid-cols-[1fr_0.94fr]">
-            <div className="space-y-8">
-              <div className="space-y-5">
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/72 px-4 py-2 text-xs uppercase tracking-[0.28em] text-black/70 shadow-[0_10px_30px_rgba(148,163,184,0.12)]">
-                  <Sparkles className="h-4 w-4" />
-                  Farmer mode
-                </span>
-                <h1 className="max-w-4xl text-5xl font-semibold leading-[1.02] text-black sm:text-6xl xl:text-[4.5rem]">
-                  One simple workspace for every trusted farm action.
-                </h1>
-                <p className="max-w-2xl text-lg leading-8 text-black/72">
-                  Create a batch, add the next custody event, validate the journey, and ask for help without jumping
-                  across pages. Advanced mode is still available when you need the deeper explorer.
-                </p>
+      <section className="section-shell pt-16 sm:pt-18 lg:pt-20">
+        <div className="glass-stage relative overflow-hidden p-5 sm:p-8">
+          <div className="absolute -right-20 top-6 h-44 w-44 rounded-full bg-white/70 blur-3xl" />
+          <div className="absolute bottom-0 left-8 h-40 w-40 rounded-full bg-white/50 blur-3xl" />
+          <div className="relative space-y-6">
+            <div className="space-y-4">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs uppercase tracking-[0.28em] text-black/70 shadow-[0_10px_30px_rgba(148,163,184,0.12)]">
+                <Sparkles className="h-4 w-4" />
+                Farmer mode
+              </span>
+              <h1 className="max-w-4xl text-4xl font-semibold leading-tight text-black sm:text-5xl">
+                Simple daily workflow for trusted farm records.
+              </h1>
+              <p className="max-w-3xl text-base leading-8 text-black/70 sm:text-lg">
+                Everything stays on one page: view batches, create a new lot, record the next movement, verify the
+                chain, and ask the assistant in your language.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link href="#create" className="button-primary gap-2">
+                Start here
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link href="/advanced" className="button-secondary">
+                Advanced mode
+              </Link>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-[24px] border border-black/10 bg-white p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-black/45">Live batches</p>
+                <p className="mt-2 text-3xl font-semibold text-black">{batches.length}</p>
               </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Link href="#create" className="button-primary gap-2">
-                  Start in farmer mode
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link href="/advanced" className="button-secondary">
-                  Open advanced mode
-                </Link>
+              <div className="rounded-[24px] border border-black/10 bg-white p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-black/45">Recorded steps</p>
+                <p className="mt-2 text-3xl font-semibold text-black">{totalBlocks}</p>
               </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {workspaceAnchors.map((item) => {
-                  const Icon = item.icon;
-
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className="glass-panel group flex items-center justify-between gap-4 rounded-[24px] px-5 py-4 transition duration-300 hover:-translate-y-1 hover:shadow-glow"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-black/10 bg-black/[0.03] text-black">
-                          <Icon className="h-4 w-4" />
-                        </span>
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.24em] text-black/45">Jump to</p>
-                          <p className="mt-1 text-sm font-semibold text-black">{item.label}</p>
-                        </div>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-black/45 transition duration-300 group-hover:translate-x-1 group-hover:text-black" />
-                    </Link>
-                  );
-                })}
+              <div className="rounded-[24px] border border-black/10 bg-white p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-black/45">Mic languages</p>
+                <p className="mt-2 text-sm font-semibold text-black">EN, TA, HI, ES, FR, AR</p>
+              </div>
+              <div className="rounded-[24px] border border-black/10 bg-white p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-black/45">Best for</p>
+                <p className="mt-2 text-sm font-semibold text-black">Fast daily updates</p>
               </div>
             </div>
 
-            <div className="grid gap-4">
-              <div className="glass-panel p-6">
-                <p className="text-xs uppercase tracking-[0.28em] text-black/45">Today&apos;s workspace</p>
-                <div className="mt-5 grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-4">
-                    <p className="text-xs uppercase tracking-[0.24em] text-black/45">Batches</p>
-                    <p className="mt-2 text-3xl font-semibold text-black">{batches.length}</p>
-                  </div>
-                  <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-4">
-                    <p className="text-xs uppercase tracking-[0.24em] text-black/45">Recorded steps</p>
-                    <p className="mt-2 text-3xl font-semibold text-black">{totalBlocks}</p>
-                  </div>
-                  <div className="rounded-[24px] border border-black/10 bg-black/[0.03] p-4">
-                    <p className="text-xs uppercase tracking-[0.24em] text-black/45">Mode</p>
-                    <p className="mt-2 text-lg font-semibold text-black">Easy, single-page</p>
-                  </div>
-                </div>
-              </div>
+            <div className="flex flex-wrap gap-2">
+              {workspaceAnchors.map((item) => {
+                const Icon = item.icon;
 
-              <div className="glass-panel p-6">
-                <p className="text-xs uppercase tracking-[0.28em] text-black/45">How farmer mode works</p>
-                <div className="mt-5 space-y-4">
-                  {[
-                    "Create a batch and lock the origin into the first trusted record.",
-                    "Add each real handoff or movement event as the produce travels.",
-                    "Validate the chain any time you need to prove nothing was altered."
-                  ].map((step, index) => (
-                    <div key={step} className="flex items-start gap-4 rounded-[24px] border border-black/10 bg-black/[0.03] p-4">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-black/10 bg-white text-sm font-semibold text-black">
-                        0{index + 1}
-                      </span>
-                      <p className="text-sm leading-7 text-black/72">{step}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-5 rounded-[24px] border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.75),rgba(255,255,255,0.35))] p-4">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-black" />
-                    <p className="text-sm font-semibold text-black">Need deeper explorer tools later?</p>
-                  </div>
-                  <p className="mt-2 text-sm leading-7 text-black/68">
-                    Advanced mode keeps the richer storytelling, explorer views, and separate route-by-route workflow
-                    intact for demos and detailed walkthroughs.
-                  </p>
-                </div>
-              </div>
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-black/72 transition duration-300 hover:border-black/20 hover:text-black"
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -149,14 +100,12 @@ export default async function HomePage() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="section-heading">
               <p className="section-heading-eyebrow">My batches</p>
-              <h2 className="text-4xl font-semibold text-black">See every live chain in one glance.</h2>
-              <p className="text-lg leading-8 text-black/70">
-                Open any batch to view the synchronized explorer, or keep working in the single-page flow below.
-              </p>
+              <h2 className="text-4xl font-semibold text-black">See every live chain at a glance.</h2>
+              <p className="text-lg leading-8 text-black/70">Open a batch if you need the full explorer, or keep working below.</p>
             </div>
 
             <Link href="/dashboard" className="button-secondary">
-              Open full explorer
+              Full explorer
             </Link>
           </div>
 
@@ -165,26 +114,45 @@ export default async function HomePage() {
       </section>
 
       <section id="create" className="section-shell mt-16 scroll-mt-28">
-        <div className="glass-stage p-3 sm:p-4 lg:p-5">
+        <div className="glass-stage space-y-5 p-3 sm:p-4 lg:p-5">
+          <div className="px-2 pt-2 sm:px-3">
+            <p className="text-xs uppercase tracking-[0.24em] text-black/45">Create batch</p>
+            <h2 className="mt-2 text-3xl font-semibold text-black">Start a new trusted batch.</h2>
+          </div>
           <CreateBatchForm />
         </div>
       </section>
 
       <section id="events" className="section-shell mt-16 scroll-mt-28">
-        <div className="glass-stage p-3 sm:p-4 lg:p-5">
+        <div className="glass-stage space-y-5 p-3 sm:p-4 lg:p-5">
+          <div className="px-2 pt-2 sm:px-3">
+            <p className="text-xs uppercase tracking-[0.24em] text-black/45">Add event</p>
+            <h2 className="mt-2 text-3xl font-semibold text-black">Record the next handoff.</h2>
+          </div>
           <AddEventForm batches={batchOptions} />
         </div>
       </section>
 
       <section id="verify" className="section-shell mt-16 scroll-mt-28">
-        <div className="glass-stage p-3 sm:p-4 lg:p-5">
+        <div className="glass-stage space-y-5 p-3 sm:p-4 lg:p-5">
+          <div className="px-2 pt-2 sm:px-3">
+            <p className="text-xs uppercase tracking-[0.24em] text-black/45">Verify</p>
+            <h2 className="mt-2 text-3xl font-semibold text-black">Check chain integrity.</h2>
+          </div>
           <VerifyWorkspace batches={batchOptions} />
         </div>
       </section>
 
       <section id="assistant" className="section-shell mt-16 scroll-mt-28">
-        <div className="glass-stage p-3 sm:p-4 lg:p-5">
-          <AIChat initialBatchId={batchOptions[0]?.batch_id ?? ""} />
+        <div className="glass-stage space-y-5 p-3 sm:p-4 lg:p-5">
+          <div className="px-2 pt-2 sm:px-3">
+            <p className="text-xs uppercase tracking-[0.24em] text-black/45">Assistant</p>
+            <h2 className="mt-2 text-3xl font-semibold text-black">Ask for help in plain language.</h2>
+            <p className="mt-2 text-sm leading-7 text-black/68">
+              Use the mic or type. Speech to text supports English, Tamil, Hindi, Spanish, French, and Arabic.
+            </p>
+          </div>
+          <AIChat initialBatchId={batchOptions[0]?.batch_id ?? ""} mode="simple" />
         </div>
       </section>
     </div>

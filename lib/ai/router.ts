@@ -188,6 +188,33 @@ function getEventTypeFromQuery(queryLower: string) {
   return directAlias?.eventType ?? null;
 }
 
+function extractCreateBatchFieldsFromText(text: string) {
+  const query = text.trim();
+
+  if (!query) {
+    return {
+      batch_id: "",
+      crop_name: "",
+      farmer_name: "",
+      farm_location: ""
+    };
+  }
+
+  const cropFromQuery = query.match(/create\s+(?:a|an|new)?\s*([a-z][a-z\s-]+?)\s+batch/i)?.[1] ?? "";
+  const farmerFromQuery = query.match(/\bfor\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i)?.[1] ?? "";
+  const locationFromQuery = query.match(/\bin\s+([A-Z][A-Za-z\s,-]+?)(?:\s+with\b|$)/i)?.[1] ?? "";
+  const followUpLocationFromQuery =
+    query.match(/^([A-Z][A-Za-z\s,-]+?)\s+with\s+batch(?:\s+id)?\s+[A-Z0-9]+(?:-[A-Z0-9]+)+/i)?.[1] ?? "";
+  const batchIdFromQuery = getBatchIdFromQuery(query) ?? "";
+
+  return {
+    batch_id: batchIdFromQuery,
+    crop_name: cropFromQuery ? toTitleCase(cropFromQuery) : "",
+    farmer_name: farmerFromQuery,
+    farm_location: locationFromQuery || followUpLocationFromQuery
+  };
+}
+
 function buildMissingFieldQuestion(fields: string[]) {
   if (fields.length === 1) {
     return `I still need ${fields[0]} to complete this request.`;
@@ -390,16 +417,42 @@ async function decideIntent(request: NormalizedAIRequest, history: AIHistoryEntr
   return heuristic;
 }
 
-function getCreateBatchDraft(request: NormalizedAIRequest, resolvedBatchId: string | null) {
-  const cropFromQuery = request.query.match(/create\s+(?:a|an|new)?\s*([a-z][a-z\s-]+?)\s+batch/i)?.[1] ?? "";
-  const farmerFromQuery = request.query.match(/\bfor\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/)?.[1] ?? "";
-  const locationFromQuery = request.query.match(/\bin\s+([A-Z][A-Za-z\s,-]+?)(?:\s+with\b|$)/)?.[1] ?? "";
+function getCreateBatchDraft(
+  request: NormalizedAIRequest,
+  resolvedBatchId: string | null,
+  history: AIHistoryEntry[]
+) {
+  const currentDraft = extractCreateBatchFieldsFromText(request.query);
+  const relevantHistory = [...history]
+    .reverse()
+    .filter((entry) => entry.type === "create_batch" && typeof entry.user_query === "string" && entry.user_query.trim());
+
+  let historyDraft = {
+    batch_id: "",
+    crop_name: "",
+    farmer_name: "",
+    farm_location: ""
+  };
+
+  for (const entry of relevantHistory) {
+    const parsed = extractCreateBatchFieldsFromText(entry.user_query ?? "");
+
+    historyDraft = {
+      batch_id: historyDraft.batch_id || parsed.batch_id,
+      crop_name: historyDraft.crop_name || parsed.crop_name,
+      farmer_name: historyDraft.farmer_name || parsed.farmer_name,
+      farm_location: historyDraft.farm_location || parsed.farm_location
+    };
+  }
 
   return {
-    batch_id: resolvedBatchId ?? getText(request.context.batch_id) ?? "",
-    crop_name: getText(request.context.crop_name) || (cropFromQuery ? toTitleCase(cropFromQuery) : ""),
-    farmer_name: getText(request.context.farmer_name) || farmerFromQuery,
-    farm_location: getText(request.context.farm_location) || locationFromQuery
+    batch_id:
+      resolvedBatchId ??
+      (getText(request.context.batch_id) || currentDraft.batch_id || historyDraft.batch_id),
+    crop_name: getText(request.context.crop_name) || currentDraft.crop_name || historyDraft.crop_name,
+    farmer_name: getText(request.context.farmer_name) || currentDraft.farmer_name || historyDraft.farmer_name,
+    farm_location:
+      getText(request.context.farm_location) || currentDraft.farm_location || historyDraft.farm_location
   };
 }
 
@@ -597,9 +650,10 @@ async function maybeTranslateMessage(message: string, request: NormalizedAIReque
 async function handleCreateBatch(
   request: NormalizedAIRequest,
   decision: IntentDecision,
-  resolvedBatch: ResolvedBatchContext
+  resolvedBatch: ResolvedBatchContext,
+  history: AIHistoryEntry[]
 ): Promise<RouterExecutionResult> {
-  const draft = getCreateBatchDraft(request, resolvedBatch.batchId);
+  const draft = getCreateBatchDraft(request, resolvedBatch.batchId, history);
   const missingFields = Object.entries(draft)
     .filter(([, value]) => !value)
     .map(([key]) => key.replace(/_/g, " "));
@@ -1110,7 +1164,7 @@ async function executeIntent(
 
   switch (decision.intent) {
     case "create_batch":
-      return handleCreateBatch(request, decision, resolvedBatch);
+      return handleCreateBatch(request, decision, resolvedBatch, history);
     case "add_block":
       return handleAddBlock(request, decision, resolvedBatch);
     case "validate_chain":

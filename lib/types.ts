@@ -152,6 +152,7 @@ export interface AIHistoryEntry {
   turn_id: number;
   type: string;
   summary: string;
+  user_query?: string;
   batch_id: string | null;
   event_type: string | null;
   hash: string | null;
