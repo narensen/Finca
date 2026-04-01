@@ -2,12 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, DatabaseZap, ShieldCheck } from "lucide-react";
+import { ArrowRight, BadgeCheck, DatabaseZap, ShieldCheck } from "lucide-react";
+import QRCode from "qrcode";
 
 import { useLanguage } from "@/components/providers/language-provider";
 import { createBatch, extractReturnedBlock } from "@/lib/api";
 import { configState } from "@/lib/env";
-import { persistBatchAndGenesis } from "@/lib/persistence";
+import { persistBatchAndGenesis, persistBatchEnhancements } from "@/lib/persistence";
+import { getAbsoluteTraceUrl } from "@/lib/trace";
 
 function generateBatchId() {
   const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -28,10 +30,12 @@ export function CreateBatchForm({ mode = "full" }: CreateBatchFormProps) {
     batch_id: generateBatchId(),
     crop_name: "Arabica Coffee",
     farmer_name: "Lucia Reyes",
-    farm_location: "Huehuetenango, Guatemala"
+    farm_location: "Huehuetenango, Guatemala",
+    farmer_phone: "+91 98765 43210",
+    farmer_verified: true
   });
 
-  const updateField = (field: keyof typeof form, value: string) => {
+  const updateField = <K extends keyof typeof form>(field: K, value: (typeof form)[K]) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
   const isSimpleMode = mode === "simple";
@@ -42,7 +46,12 @@ export function CreateBatchForm({ mode = "full" }: CreateBatchFormProps) {
 
     startTransition(async () => {
       try {
-        const response = await createBatch(form);
+        const response = await createBatch({
+          batch_id: form.batch_id,
+          crop_name: form.crop_name,
+          farmer_name: form.farmer_name,
+          farm_location: form.farm_location
+        });
         const batchId = form.batch_id;
         const block = extractReturnedBlock(response, batchId);
 
@@ -52,11 +61,25 @@ export function CreateBatchForm({ mode = "full" }: CreateBatchFormProps) {
 
         await persistBatchAndGenesis(
           {
-            ...form,
+            batch_id: form.batch_id,
+            crop_name: form.crop_name,
+            farmer_name: form.farmer_name,
+            farm_location: form.farm_location,
             created_at: block.timestamp
           },
           block
         );
+
+        try {
+          const qrCodeUrl = await QRCode.toDataURL(getAbsoluteTraceUrl(batchId));
+          await persistBatchEnhancements(batchId, {
+            farmer_phone: form.farmer_phone.trim() || null,
+            farmer_verified: form.farmer_verified,
+            qr_code_url: qrCodeUrl
+          });
+        } catch (enhancementError) {
+          console.warn("Batch trust extras could not be stored.", enhancementError);
+        }
 
         setStatus({
           tone: "success",
@@ -122,6 +145,16 @@ export function CreateBatchForm({ mode = "full" }: CreateBatchFormProps) {
             />
           </label>
 
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-black/80">{t("createBatch.farmerPhone")}</span>
+            <input
+              value={form.farmer_phone}
+              onChange={(event) => updateField("farmer_phone", event.target.value)}
+              className="input-shell"
+              placeholder={t("createBatch.farmerPhonePlaceholder")}
+            />
+          </label>
+
           <label className="space-y-2 md:col-span-2">
             <span className="text-sm font-medium text-black/80">{t("createBatch.farmLocation")}</span>
             <input
@@ -131,6 +164,27 @@ export function CreateBatchForm({ mode = "full" }: CreateBatchFormProps) {
               className="input-shell"
               placeholder={t("createBatch.farmLocationPlaceholder")}
             />
+          </label>
+
+          <label className="md:col-span-2">
+            <div className="flex items-center justify-between gap-4 rounded-[22px] border border-black/10 bg-black/[0.03] px-4 py-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-black/85">{t("createBatch.identityTitle")}</p>
+                <p className="text-sm text-black/60">{t("createBatch.identityDesc")}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => updateField("farmer_verified", !form.farmer_verified)}
+                className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition duration-300 ${
+                  form.farmer_verified
+                    ? "border-finca-emerald/35 bg-finca-emerald/10 text-black"
+                    : "border-black/10 bg-white text-black/70"
+                }`}
+              >
+                <BadgeCheck className="h-4 w-4" />
+                {form.farmer_verified ? t("createBatch.verifiedFarmer") : t("createBatch.unverifiedSource")}
+              </button>
+            </div>
           </label>
         </div>
 

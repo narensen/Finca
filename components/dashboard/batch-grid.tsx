@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Blocks, Clock3, MapPin, Sprout, UserCircle2 } from "lucide-react";
+import { ArrowRight, BadgeCheck, Blocks, Clock3, MapPin, QrCode, Sprout, UserCircle2 } from "lucide-react";
 
 import { useLanguage } from "@/components/providers/language-provider";
 import { EmptyState } from "@/components/state/empty-state";
+import { QrPreview } from "@/components/trace/qr-preview";
+import { getTracePath } from "@/lib/trace";
 import { formatDateTime } from "@/lib/utils";
 import type { BatchSummary } from "@/lib/types";
 
@@ -41,6 +43,8 @@ export function BatchGrid({
     <div className={isSimpleMode ? "grid gap-4 xl:grid-cols-2" : "grid gap-6 xl:grid-cols-2"}>
       {batches.map((batch) => {
         const previewDots = Math.max(2, Math.min(batch.block_count || 0, 5));
+        const tracePath = getTracePath(batch.batch_id);
+        const isVerified = Boolean(batch.farmer_verified);
 
         return (
           <Link
@@ -58,6 +62,16 @@ export function BatchGrid({
                   </span>
                   <span className="rounded-full border border-black/10 bg-black/[0.03] px-3 py-1 text-xs uppercase tracking-[0.24em] text-black/55">
                     {batch.block_count} {t("batchGrid.blocksSuffix")}
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs uppercase tracking-[0.24em] ${
+                      isVerified
+                        ? "border-finca-emerald/30 bg-finca-emerald/10 text-black"
+                        : "border-finca-ember/25 bg-finca-ember/10 text-black"
+                    }`}
+                  >
+                    <BadgeCheck className="h-3.5 w-3.5" />
+                    {isVerified ? t("createBatch.verifiedFarmer") : t("createBatch.unverifiedSource")}
                   </span>
                 </div>
                 <h3 className="text-2xl font-semibold text-black">{batch.crop_name}</h3>
@@ -105,24 +119,33 @@ export function BatchGrid({
             ) : (
               <div className="rounded-[26px] border border-black/10 bg-black/[0.03] p-5">
                 <div className="mb-4 flex items-center justify-between gap-4">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xs uppercase tracking-[0.28em] text-black/45">{t("batchGrid.chainPreview")}</p>
                     <p className="mt-2 text-sm text-black/70">
                       {batch.last_event_type ? getEventLabel(batch.last_event_type) : t("batchGrid.genesisPending")}
                     </p>
+                    <p className="mt-2 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-black/45">
+                      <QrCode className="h-3.5 w-3.5" />
+                      {tracePath}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {Array.from({ length: previewDots }).map((_, index) => (
-                      <span
-                        key={`${batch.batch_id}-${index}`}
-                        className="flex items-center gap-2"
-                      >
-                        <span className="h-3 w-3 rounded-full border border-finca-mint/30 bg-finca-mint/70 shadow-[0_0_18px_rgba(140,245,211,0.35)]" />
-                        {index < previewDots - 1 ? (
-                          <span className="h-px w-8 bg-gradient-to-r from-finca-mint/70 to-white/10" />
-                        ) : null}
-                      </span>
-                    ))}
+                  <div className="flex items-center gap-4">
+                    <div className="hidden md:block">
+                      <QrPreview batchId={batch.batch_id} qrCodeUrl={batch.qr_code_url} size={84} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {Array.from({ length: previewDots }).map((_, index) => (
+                        <span
+                          key={`${batch.batch_id}-${index}`}
+                          className="flex items-center gap-2"
+                        >
+                          <span className="h-3 w-3 rounded-full border border-finca-mint/30 bg-finca-mint/70 shadow-[0_0_18px_rgba(140,245,211,0.35)]" />
+                          {index < previewDots - 1 ? (
+                            <span className="h-px w-8 bg-gradient-to-r from-finca-mint/70 to-white/10" />
+                          ) : null}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
 

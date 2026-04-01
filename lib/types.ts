@@ -13,6 +13,9 @@ export interface Batch {
   crop_name: string;
   farmer_name: string;
   farm_location: string;
+  farmer_phone?: string | null;
+  farmer_verified?: boolean | null;
+  qr_code_url?: string | null;
   created_at?: string | null;
 }
 
@@ -48,6 +51,12 @@ export interface CreateBatchPayload {
   crop_name: string;
   farmer_name: string;
   farm_location: string;
+}
+
+export interface BatchEnhancements {
+  farmer_phone?: string | null;
+  farmer_verified?: boolean | null;
+  qr_code_url?: string | null;
 }
 
 export interface CreateBlockPayload {

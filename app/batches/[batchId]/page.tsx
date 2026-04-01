@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { ArrowRight, Blocks, Leaf, MapPin, UserCircle2 } from "lucide-react";
 
 import { ChainExplorer } from "@/components/chain/chain-explorer";
+import { BatchQrCard } from "@/components/trace/batch-qr-card";
+import { FarmerIdentityCard } from "@/components/trace/farmer-identity-card";
 import { getBatchChain } from "@/lib/data";
 import { createTranslator } from "@/lib/i18n";
 import { getRequestLanguage } from "@/lib/i18n-server";
@@ -113,33 +115,42 @@ export default async function BatchDetailPage({
                   {t("batchDetail.latestBlock")}
                 </div>
                 <p className="text-lg font-semibold text-black">
-                  {chain.blocks.at(-1)?.event_type ? chain.blocks.at(-1)?.event_type.replace(/_/g, " ") : t("batchGrid.genesis")}
+                  {chain.blocks.at(-1)?.event_type ? t(`events.${chain.blocks.at(-1)?.event_type}`) : t("batchGrid.genesis")}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="glass-panel flex flex-col justify-between p-6 lg:p-8">
-            <div>
-              <p className="section-heading-eyebrow">{t("batchDetail.actions")}</p>
-              <h2 className="mt-4 text-3xl font-semibold text-black">{t("batchDetail.actionsTitle")}</h2>
-              <p className="mt-4 text-sm leading-7 text-black/68">{t("batchDetail.actionsDesc")}</p>
+          <div className="space-y-6">
+            <div className="glass-panel flex flex-col justify-between p-6 lg:p-8">
+              <div>
+                <p className="section-heading-eyebrow">{t("batchDetail.actions")}</p>
+                <h2 className="mt-4 text-3xl font-semibold text-black">{t("batchDetail.actionsTitle")}</h2>
+                <p className="mt-4 text-sm leading-7 text-black/68">{t("batchDetail.actionsDesc")}</p>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                <Link href={`/add-event?batchId=${chain.batch_id}`} className="button-primary w-full justify-center gap-2">
+                  {t("common.addEvent")}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link href={`/trace/${chain.batch_id}`} className="button-secondary w-full justify-center gap-2">
+                  {t("trace.openTrace")}
+                  <Blocks className="h-4 w-4" />
+                </Link>
+                <Link href="/verify" className="button-secondary w-full justify-center gap-2">
+                  {t("common.verify")}
+                  <Blocks className="h-4 w-4" />
+                </Link>
+              </div>
             </div>
 
-            <div className="mt-6 space-y-3">
-              <Link href={`/add-event?batchId=${chain.batch_id}`} className="button-primary w-full justify-center gap-2">
-                {t("common.addEvent")}
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link href="/verify" className="button-secondary w-full justify-center gap-2">
-                {t("common.verify")}
-                <Blocks className="h-4 w-4" />
-              </Link>
-            </div>
+            <FarmerIdentityCard batch={chain} />
+            <BatchQrCard batchId={chain.batch_id} qrCodeUrl={chain.qr_code_url} />
           </div>
         </div>
 
-        <ChainExplorer batch={chain} blocks={chain.blocks} />
+        <ChainExplorer batch={chain} blocks={chain.blocks} allowTamperDemo />
       </div>
     </div>
   );

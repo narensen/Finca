@@ -139,6 +139,9 @@ export function deriveBatchFromBlocks(batchId: string, blocks: Block[]): Batch |
     batch_id: getStringValue(genesisBlock.data, ["batch_id"]) ?? batchId,
     crop_name: getStringValue(genesisBlock.data, ["crop_name", "crop", "product_name", "product"]) ?? "Recorded agricultural batch",
     farmer_name: getStringValue(genesisBlock.data, ["farmer_name", "farmer", "producer", "actor"]) ?? "Origin recorded",
+    farmer_phone: getStringValue(genesisBlock.data, ["farmer_phone", "phone", "contact_phone"]) ?? null,
+    farmer_verified: null,
+    qr_code_url: null,
     farm_location:
       getStringValue(genesisBlock.data, ["farm_location", "location", "origin", "source_location"]) ?? "Location recorded",
     created_at: genesisBlock.timestamp ?? null
